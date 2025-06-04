@@ -6,11 +6,35 @@ from datetime import datetime
 from dbus_service import start_dbus_service
 from plugin_loader import PluginLoader
 import threading
+import os
 
 # ---- Cấu hình hệ thống ----
 LOG_FILE = "/var/log/usb_classifier.log"
 MOUNT_BASE = "/mnt/usb"
-WHITELIST_VENDORS = ["0781", "090c"]  # SanDisk, Silicon Motion
+
+# ---- Load USB IDs ----
+USB_IDS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'usb_ids.txt')
+
+def get_all_device_ids(usb_ids_path):
+    device_ids = []
+    current_vendor = None
+    try:
+        with open(usb_ids_path, 'r') as f:
+            for line in f:
+                if line.startswith('#') or not line.strip():
+                    continue
+                if not line.startswith('\t'):
+                    current_vendor = line.strip().split(None, 1)[0].lower()
+                else:
+                    parts = line.strip().split(None, 1)
+                    if len(parts) >= 1 and current_vendor:
+                        product_id = parts[0].lower()
+                        device_ids.append((current_vendor, product_id))
+    except Exception as e:
+        logging.warning(f"Could not load device IDs from usb_ids.txt: {e}")
+    return device_ids
+
+WHITELIST_DEVICES = get_all_device_ids(USB_IDS_PATH)
 
 # ---- Thiết lập logging ----
 logging.basicConfig(
@@ -19,25 +43,52 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+def load_usb_ids(file_path):
+    usb_ids = {}
+    current_vendor = None
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                if line.startswith('#') or not line.strip():
+                    continue
+                if not line.startswith('\t'):
+                    parts = line.strip().split(None, 1)
+                    if len(parts) == 2:
+                        vendor_id, vendor_name = parts
+                        current_vendor = vendor_id.lower()
+                        usb_ids[current_vendor] = {'name': vendor_name, 'products': {}}
+                else:
+                    parts = line.strip().split(None, 1)
+                    if len(parts) == 2 and current_vendor:
+                        product_id, product_name = parts
+                        usb_ids[current_vendor]['products'][product_id.lower()] = product_name
+    except Exception as e:
+        logging.warning(f"Could not load usb_ids.txt: {e}")
+    return usb_ids
+
+USB_IDS = load_usb_ids(USB_IDS_PATH)
+
 def log_event(device, classification):
     """Ghi log sự kiện USB"""
-    vendor = device.get('ID_VENDOR_ID', 'unknown')
-    product = device.get('ID_MODEL_ID', 'unknown')
+    vendor = device.get('ID_VENDOR_ID', 'unknown').lower()
+    product = device.get('ID_MODEL_ID', 'unknown').lower()
     serial = device.get('ID_SERIAL_SHORT', 'unknown')
-    
+    vendor_name = USB_IDS.get(vendor, {}).get('name', vendor)
+    product_name = USB_IDS.get(vendor, {}).get('products', {}).get(product, product)
     logging.info(
         f"Device {device.device_node}: "
-        f"Vendor={vendor}, Product={product}, "
+        f"Vendor={vendor} ({vendor_name}), Product={product} ({product_name}), "
         f"Serial={serial}, Class={classification}"
     )
 
 def classify_device(device):
     """Phân loại thiết bị với thuật toán cải tiến"""
     usb_class = device.get('ID_USB_INTERFACES', '').lower()
-    vendor = device.get('ID_VENDOR_ID', '')
+    vendor = device.get('ID_VENDOR_ID', '').lower()
+    product = device.get('ID_MODEL_ID', '').lower()
     
     # Kiểm tra whitelist
-    if vendor not in WHITELIST_VENDORS:
+    if (vendor, product) not in WHITELIST_DEVICES:
         return "blocked"
     
     # Phân loại theo class code
@@ -51,6 +102,19 @@ def classify_device(device):
         return "video"
     
     # Phân loại dự phòng bằng USB ID database
+    vendor_name = USB_IDS.get(vendor, {}).get('name', None)
+    product_name = USB_IDS.get(vendor, {}).get('products', {}).get(product, None)
+    if vendor_name or product_name:
+        # Optionally, use this info for more advanced classification
+        if product_name:
+            if 'storage' in product_name.lower():
+                return "storage"
+            elif 'keyboard' in product_name.lower() or 'mouse' in product_name.lower():
+                return "hid"
+            elif 'audio' in product_name.lower():
+                return "audio"
+            elif 'video' in product_name.lower() or 'webcam' in product_name.lower():
+                return "video"
     try:
         output = subprocess.check_output(
             f"lsusb -d {vendor}:{product}",
@@ -103,10 +167,20 @@ if __name__ == "__main__":
     
     logging.info("USB Classifier Daemon Started")
     
+    # Khởi tạo và load plugin
+    plugins_dir = os.path.join(os.path.dirname(__file__), 'plugins')
+    plugin_loader = PluginLoader(plugins_dir)
+    plugin_loader.load_plugins()
+
     for device in iter(monitor.poll, None):
         if device.action == 'add':
             classification = classify_device(device)
             handle_device(device, classification)
+            # Gọi plugin nếu là storage, hid, audio, video
+            if classification in ("storage", "hid", "audio", "video"):
+                plugin_result = plugin_loader.handle_device(device, 'add')
+                if plugin_result:
+                    logging.info(f"Plugin handled device: {plugin_result}")
 
 def main():
     # ... (khởi tạo context, monitor)

@@ -17,6 +17,25 @@ PRODUCT_ID=$(udevadm info -q property -n "$DEVICE_PATH" | grep "ID_MODEL_ID" | c
 SERIAL=$(udevadm info -q property -n "$DEVICE_PATH" | grep "ID_SERIAL_SHORT" | cut -d= -f2)
 CLASS_CODE=$(udevadm info -q property -n "$DEVICE_PATH" | grep "ID_USB_CLASS" | cut -d= -f2)
 
+# ---- Load whitelist (vendor+product) ----
+WHITELIST_FILE="/usr/local/share/usb_whitelist.txt"
+if [ ! -f "$WHITELIST_FILE" ]; then
+    echo "Whitelist file $WHITELIST_FILE not found!" >&2
+    exit 1
+fi
+mapfile -t ALLOWED_DEVICES < "$WHITELIST_FILE"
+
+# ---- Hàm kiểm tra whitelist ----
+function is_allowed_device() {
+    local id="$1:$2"
+    for allowed in "${ALLOWED_DEVICES[@]}"; do
+        if [[ "$allowed" == "$id" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # ---- Hàm tiện ích ----
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
@@ -43,8 +62,7 @@ mount_device() {
 }
 
 # ---- Kiểm tra bảo mật ----
-# Chặn thiết bị không có trong whitelist
-if [[ ! " ${ALLOWED_VENDORS[@]} " =~ " ${VENDOR_ID} " ]]; then
+if ! is_allowed_device "$VENDOR_ID" "$PRODUCT_ID"; then
     log "Blocked unauthorized device: $VENDOR_ID:$PRODUCT_ID"
     exit 1
 fi
