@@ -1,0 +1,10 @@
+policy:
+  whitelist:
+    - vid: 0x1234
+      pid: 0x5678
+  blacklist:
+    - class: storage
+plugins:
+  - storage_plugin
+  - audio_plugin
+mount_point: /media/usb
