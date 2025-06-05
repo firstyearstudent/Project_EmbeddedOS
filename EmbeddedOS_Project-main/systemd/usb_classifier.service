@@ -1,11 +1,13 @@
 [Unit]
-Description=USB Device Classifier Daemon
-After=syslog.target
+Description=USB Manager Daemon
+After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /usr/local/bin/usb_classifier.py
-Restart=always
-User=root
+Type=simple
+ExecStart=/home/manhquan/WORKSPACE/USB-Devices-Manager-for-Pi-4-Model-B/EmbeddedOS_Project-main/others/usb_manager_daemon
+Restart=on-failure
+StandardOutput=syslog
+StandardError=syslog
 
 [Install]
 WantedBy=multi-user.target
