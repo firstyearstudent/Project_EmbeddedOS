@@ -1,0 +1,1 @@
+savedcmd_/home/manhquan/WORKSPACE/USB-Devices-Manager-for-Pi-4-Model-B/EmbeddedOS_Project-main/others/modules.order := {   echo /home/manhquan/WORKSPACE/USB-Devices-Manager-for-Pi-4-Model-B/EmbeddedOS_Project-main/others/usb_mouse_driver.o; :; } > /home/manhquan/WORKSPACE/USB-Devices-Manager-for-Pi-4-Model-B/EmbeddedOS_Project-main/others/modules.order
