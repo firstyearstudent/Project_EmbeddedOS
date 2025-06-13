@@ -96,7 +96,7 @@ class USBManagerService(dbus.service.Object):
     @dbus.service.signal("org.example.USBManager",
                          signature='ss')
     def SendEvent(self, event_type, data):
-        pass  # Signal sẽ được gửi khi gọi hàm này
+        pass  
 
 def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
