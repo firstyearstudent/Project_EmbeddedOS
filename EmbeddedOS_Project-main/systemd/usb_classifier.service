@@ -1,0 +1,13 @@
+[Unit]
+Description=USB Manager Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /ABSOLUTE/PATH/TO/EmbeddedOS_Project-main/usb_management/usb_classify.py
+Restart=on-failure
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target

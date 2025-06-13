@@ -1,0 +1,13 @@
+[Unit]
+Description=USB DBus Manager Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /ABSOLUTE/PATH/TO/EmbeddedOS_Project-main/usb_management/dbus_service.py
+Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 

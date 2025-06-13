@@ -1,0 +1,8 @@
+
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
+    PROGRAM="/usr/local/bin/usb_classifier %s{idVendor} %s{idProduct}", \
+    ENV{USB_CLASS}="%c"
+
+
+ENV{USB_CLASS}=="storage", RUN+="/usr/local/bin/usb_handler storage %k"
+ENV{USB_CLASS}=="hid", RUN+="/usr/local/bin/usb_handler hid %k"
